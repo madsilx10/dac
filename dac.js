@@ -204,6 +204,7 @@ async function connectX(session, akun, idx, total) {
 
     // Approve di Twitter
     const twitterBody = new URLSearchParams({
+      approval: "true",
       response_type: "code",
       client_id,
       redirect_uri,
