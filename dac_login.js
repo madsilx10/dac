@@ -53,7 +53,7 @@ function buildSiweMessage(address, nonce) {
   const exp = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
 
   // Persis format dari browser: domain \n address \n\n statement \n\n fields
-  return `interstellar.dachain.io wants you to sign in with your Ethereum account:\n${address}\n\n\nURI: ${BASE}\nVersion: 1\nChain ID: 1\nNonce: ${nonce}\nIssued At: ${issuedAt}\nExpiration Time: ${exp}`;
+  return `interstellar.dachain.io wants you to sign in with your Ethereum account:\n${address}\n\n\nURI: ${BASE}\nVersion: 1\nChain ID: 21892\nNonce: ${nonce}\nIssued At: ${issuedAt}\nExpiration Time: ${exp}`;
 }
 
 async function post(url, body, cookie) {
