@@ -195,9 +195,10 @@ async function connectX(session, akun, idx, total) {
       || startJson?.data?.auth_url
       || startJson?.data?.url;
     if (!authUrl) throw new Error("Gagal dapat auth_url: " + JSON.stringify(startJson));
-    console.log(`  auth_url ok`);
-
+    console.log(`  auth_url: ${authUrl}`)
     const params = parseQS(authUrl);
+    console.log(`  params: ${JSON.stringify(params)}`);
+
     const { state, code_challenge, code_challenge_method, client_id } = params;
     const redirect_uri = params.redirect_uri || `${BASE}/api/v1/auth/social/x/callback/`;
     const scope = params.scope || "users.read tweet.read";
