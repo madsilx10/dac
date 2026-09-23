@@ -227,15 +227,10 @@ async function connectX(session, akun, idx, total) {
     const html = await getRes.text();
     require('fs').writeFileSync('debug_html.txt', html); console.log(`  HTML saved to debug_html.txt | status: ${getRes.status} | url: ${getRes.url}`);
 
-    // Extract auth_code dari hidden input atau JSON embed
-    let authCode = null;
-    const codeMatch = html.match(/["']auth_code["']\s*[,:]\s*["']([\w-]+)["']/);
-    if (codeMatch) authCode = codeMatch[1];
-    if (!authCode) {
-      const inputMatch = html.match(/name=["']auth_code["']\s+value=["']([^"']+)["']/);
-      if (inputMatch) authCode = inputMatch[1];
-    }
-    if (!authCode) { console.log("auth_code not found, check debug_html.txt"); return false; }
+    // Extract authCode dari JSON embed di HTML
+    const authCodeMatch = html.match(/authCode:\\"([A-Za-z0-9+\/=_-]+)\\"/);
+    if (!authCodeMatch) { console.log("auth_code not found, check debug_html.txt"); return false; }
+    const authCode = authCodeMatch[1];
     console.log(`  auth_code: ${authCode.slice(0, 20)}...`);
 
     // Step 2b: POST approve dengan auth_code
