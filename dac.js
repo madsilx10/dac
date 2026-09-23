@@ -226,7 +226,8 @@ async function connectX(session, akun, idx, total) {
       const inputMatch = html.match(/name=["']auth_code["']\s+value=["']([^"']+)["']/);
       if (inputMatch) authCode = inputMatch[1];
     }
-    if (!authCode) throw new Error("Gagal extract auth_code dari HTML");
+    if (!authCode) throw new Error("Gagal extract auth_code dari HTML:
+" + html.slice(0, 2000));
     console.log(`  auth_code: ${authCode.slice(0, 20)}...`);
 
     // Step 2b: POST approve dengan auth_code
