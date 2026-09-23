@@ -23,7 +23,13 @@ function loadAkun() {
   });
 }
 
+function getCsrf(cookie) {
+  const m = cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : "";
+}
+
 function buildHeaders(cookie = "") {
+  const csrf = getCsrf(cookie);
   return {
     "Accept": "application/json",
     "Content-Type": "application/json",
@@ -37,6 +43,7 @@ function buildHeaders(cookie = "") {
     "Sec-Fetch-Mode": "cors",
     "Sec-Fetch-Site": "same-origin",
     ...(cookie ? { Cookie: cookie } : {}),
+    ...(csrf ? { "X-Csrftoken": csrf } : {}),
   };
 }
 
