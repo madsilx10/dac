@@ -50,7 +50,7 @@ function parseCookies(existing = "", setCookieArr = []) {
 function buildSiweMessage(address, nonce) {
   const now = new Date();
   const issuedAt = now.toISOString();
-  const exp = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+  const exp = new Date(now.getTime() + 2 * 60 * 1000).toISOString();
 
   // Persis format dari browser: domain \n address \n\n statement \n\n fields
   return `interstellar.dachain.io wants you to sign in with your Ethereum account:\n${address}\n\n\nURI: ${BASE}\nVersion: 1\nChain ID: 21892\nNonce: ${nonce}\nIssued At: ${issuedAt}\nExpiration Time: ${exp}`;
