@@ -207,12 +207,19 @@ async function connectX(session, akun, idx, total) {
     const getRes = await fetch(authUrl, {
       method: "GET",
       headers: {
-        ...buildTwitterHeaders(authToken, ct0),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Referer": "https://x.com/",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+        "User-Agent": UA,
+        "Sec-Ch-Ua": '"Mises";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+        "Sec-Ch-Ua-Mobile": "?1",
+        "Sec-Ch-Ua-Platform": '"Android"',
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Site": "cross-site",
+        "Referer": "https://interstellar.dachain.io/",
+        "Cookie": `auth_token=${authToken}; ct0=${ct0}`,
+        "Upgrade-Insecure-Requests": "1",
       },
       redirect: "follow",
     });
