@@ -228,7 +228,7 @@ async function connectX(session, akun, idx, total) {
     require('fs').writeFileSync('debug_html.txt', html); console.log(`  HTML saved to debug_html.txt | status: ${getRes.status} | url: ${getRes.url}`);
 
     // Extract authCode dari JSON embed di HTML
-    const authCodeMatch = html.match(/authCode:\\"([A-Za-z0-9+\/=_-]+)\\"/);
+    const authCodeMatch = html.match(/authCode:"([^"]+)"/);
     if (!authCodeMatch) { console.log("auth_code not found, check debug_html.txt"); return false; }
     const authCode = authCodeMatch[1];
     console.log(`  auth_code: ${authCode.slice(0, 20)}...`);
