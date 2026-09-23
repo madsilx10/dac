@@ -216,7 +216,9 @@ async function connectX(session, akun, idx, total) {
       },
       redirect: "follow",
     });
+    console.log(`  GET status: ${getRes.status} | url: ${getRes.url}`);
     const html = await getRes.text();
+    console.log(`  HTML snippet: ${html.slice(0, 500)}`);
 
     // Extract auth_code dari hidden input atau JSON embed
     let authCode = null;
