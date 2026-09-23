@@ -203,16 +203,36 @@ async function connectX(session, akun, idx, total) {
     const redirect_uri = params.redirect_uri || `${BASE}/api/v1/auth/social/x/callback/`;
     const scope = params.scope || "users.read tweet.read";
 
-    // Approve di Twitter
+    // Step 2a: GET authorize page → ambil auth_code
+    const getRes = await fetch(authUrl, {
+      method: "GET",
+      headers: {
+        ...buildTwitterHeaders(authToken, ct0),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://x.com/",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+      },
+      redirect: "follow",
+    });
+    const html = await getRes.text();
+
+    // Extract auth_code dari hidden input atau JSON embed
+    let authCode = null;
+    const codeMatch = html.match(/["']auth_code["']\s*[,:]\s*["']([\w-]+)["']/);
+    if (codeMatch) authCode = codeMatch[1];
+    if (!authCode) {
+      const inputMatch = html.match(/name=["']auth_code["']\s+value=["']([^"']+)["']/);
+      if (inputMatch) authCode = inputMatch[1];
+    }
+    if (!authCode) throw new Error("Gagal extract auth_code dari HTML");
+    console.log(`  auth_code: ${authCode.slice(0, 20)}...`);
+
+    // Step 2b: POST approve dengan auth_code
     const twitterBody = new URLSearchParams({
       approval: "true",
-      response_type: "code",
-      client_id,
-      redirect_uri,
-      scope,
-      state,
-      code_challenge,
-      code_challenge_method: code_challenge_method || "S256",
+      code: authCode,
     });
 
     const approveRes = await fetch("https://api.x.com/2/oauth2/authorize", {
