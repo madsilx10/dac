@@ -46,20 +46,14 @@ function parseCookies(existing = "", setCookieArr = []) {
   return Object.entries(jar).map(([k, v]) => `${k}=${v}`).join("; ");
 }
 
+// Format SIWE persis seperti di browser (EIP-4361)
 function buildSiweMessage(address, nonce) {
   const now = new Date();
-  const exp = new Date(now.getTime() + 60 * 60 * 1000);
-  return [
-    `interstellar.dachain.io wants you to sign in with your Ethereum account:`,
-    address,
-    "",
-    `URI: ${BASE}`,
-    `Version: 1`,
-    `Chain ID: 1`,
-    `Nonce: ${nonce}`,
-    `Issued At: ${now.toISOString()}`,
-    `Expiration Time: ${exp.toISOString()}`,
-  ].join("\n");
+  const issuedAt = now.toISOString();
+  const exp = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+
+  // Persis format dari browser: domain \n address \n\n statement \n\n fields
+  return `interstellar.dachain.io wants you to sign in with your Ethereum account:\n${address}\n\n\nURI: ${BASE}\nVersion: 1\nChain ID: 1\nNonce: ${nonce}\nIssued At: ${issuedAt}\nExpiration Time: ${exp}`;
 }
 
 async function post(url, body, cookie) {
@@ -74,11 +68,10 @@ async function post(url, body, cookie) {
 }
 
 async function loginWallet(pk, idx, total) {
-  // Support ethers v5 & v6
   const wallet = new ethers.Wallet(pk);
   const address = typeof ethers.utils !== "undefined"
-    ? ethers.utils.getAddress(wallet.address)  // v5
-    : ethers.getAddress(wallet.address);        // v6
+    ? ethers.utils.getAddress(wallet.address)
+    : ethers.getAddress(wallet.address);
 
   console.log(`\n[${idx + 1}/${total}] ${address}`);
 
@@ -97,6 +90,8 @@ async function loginWallet(pk, idx, total) {
     console.log(`  nonce: ${nonce}`);
 
     const message = buildSiweMessage(address, nonce);
+    console.log(`  message preview: ${message.slice(0, 80).replace(/\n/g, "\\n")}...`);
+
     const signature = await wallet.signMessage(message);
 
     const { json: siweJson, setCookie: c2, status } = await post(
