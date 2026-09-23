@@ -74,8 +74,12 @@ async function post(url, body, cookie) {
 }
 
 async function loginWallet(pk, idx, total) {
+  // Support ethers v5 & v6
   const wallet = new ethers.Wallet(pk);
-  const address = ethers.utils.getAddress(await wallet.getAddress());
+  const address = typeof ethers.utils !== "undefined"
+    ? ethers.utils.getAddress(wallet.address)  // v5
+    : ethers.getAddress(wallet.address);        // v6
+
   console.log(`\n[${idx + 1}/${total}] ${address}`);
 
   let cookie = "";
