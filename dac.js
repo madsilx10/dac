@@ -218,7 +218,7 @@ async function connectX(session, akun, idx, total) {
     });
     console.log(`  GET status: ${getRes.status} | url: ${getRes.url}`);
     const html = await getRes.text();
-    console.log(`  HTML snippet: ${html.slice(0, 500)}`);
+    require('fs').writeFileSync('debug_html.txt', html); console.log(`  HTML saved to debug_html.txt | status: ${getRes.status} | url: ${getRes.url}`);
 
     // Extract auth_code dari hidden input atau JSON embed
     let authCode = null;
@@ -228,8 +228,7 @@ async function connectX(session, akun, idx, total) {
       const inputMatch = html.match(/name=["']auth_code["']\s+value=["']([^"']+)["']/);
       if (inputMatch) authCode = inputMatch[1];
     }
-    if (!authCode) throw new Error("Gagal extract auth_code dari HTML:
-" + html.slice(0, 2000));
+    if (!authCode) { console.log("auth_code not found, check debug_html.txt"); return false; }
     console.log(`  auth_code: ${authCode.slice(0, 20)}...`);
 
     // Step 2b: POST approve dengan auth_code
