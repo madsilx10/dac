@@ -351,15 +351,35 @@ async function postTweet(akun, text, url) {
 
     const tweetId = json?.data?.create_tweet?.tweet_results?.result?.rest_id;
     if (tweetId) {
-      console.log(`  ✓ Tweet posted: https://x.com/i/web/status/${tweetId}`);
-      return true;
+      console.log(`  ✓ Tweet posted: ${tweetId}`);
+      return tweetId;
     } else {
       console.error(`  ✗ Tweet gagal: ${JSON.stringify(json?.errors ?? json).slice(0, 200)}`);
-      return false;
+      return null;
     }
   } catch (err) {
     console.error(`  ✗ Tweet error: ${err.message}`);
     return false;
+  }
+}
+
+// ── Helper: Extract kode dari card image ──
+async function extractCode(assetUrl) {
+  try {
+    const Tesseract = require("tesseract.js");
+    const imgRes = await fetch(assetUrl);
+    const buf = Buffer.from(await imgRes.arrayBuffer());
+
+    const { data: { text } } = await Tesseract.recognize(buf, "eng", {
+      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-",
+    });
+
+    // Cari pattern XX-XXXX-XXXX-XXXX
+    const match = text.replace(/\s/g, "").match(/[A-Z]{2}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}/);
+    return match ? match[0] : null;
+  } catch (err) {
+    console.error(`  ✗ OCR error: ${err.message}`);
+    return null;
   }
 }
 
@@ -410,29 +430,59 @@ async function completeTasks(session, walletAddress, akun) {
       });
       const cardJson = await cardRes.json();
       const cardState = cardJson?.data?.state;
-      const assetUrl = cardJson?.data?.asset_url;
       console.log(`  Card state: ${cardState}`);
+
+      // Save asset_url ke file
+      if (cardJson?.data?.asset_url) {
+        const fs = require("fs");
+        const line = `${walletAddress} | ${cardJson.data.asset_url}\n`;
+        fs.appendFileSync("cards.txt", line);
+        console.log(`  Card URL saved → cards.txt`);
+      }
 
       if (cardState === "ready") {
         // Jeda 10 detik sebelum card_share
         console.log(`  Jeda 10 detik...`);
         await new Promise(r => setTimeout(r, 10000));
 
-        // Post tweet dengan card
+        // Ambil handle X dari me/
+        const meData = await checkMe(cookie);
+        const xHandle = meData?.social_links?.find(s => s.provider === "x")?.handle;
+        if (!xHandle) throw new Error("Handle X tidak ditemukan");
+
+        // Post tweet
         const tweetText = "I'm pre-registered for the DAC mainnet launch. Mission card in hand — see you at the gate. @dac_chain";
         const cardUrl = `${BASE}/api/v1/launch/card/${cardJson.data.asset_key}/`;
-        const tweetPosted = await postTweet(akun, tweetText, cardUrl);
+        const tweetId = await postTweet(akun, tweetText, cardUrl);
 
-        if (tweetPosted) {
-          // Attempt card_share
+        if (tweetId) {
+          const postUrl = `https://x.com/${xHandle}/status/${tweetId}`;
+          console.log(`  Post URL: ${postUrl}`);
+
+          // Submit post_url ke card_share
           const shareRes = await fetch(`${BASE}/api/v1/launch/tasks/card_share/attempt/`, {
             method: "POST",
             headers: buildHeaders(cookie),
-            body: JSON.stringify({ declared: true }),
+            body: JSON.stringify({ post_url: postUrl }),
           });
           const shareJson = await shareRes.json();
           const shareState = shareJson?.data?.task?.state;
           console.log(`  ${shareState === "verified" ? "✓" : "~"} card_share: ${shareState}`);
+
+          // Extract kode dari gambar card
+          if (shareState === "verified" && cardJson?.data?.asset_url) {
+            console.log(`  Ekstrak kode dari card...`);
+            const code = await extractCode(cardJson.data.asset_url);
+            if (code) {
+              console.log(`  ✓ Kode: ${code}`);
+              const fs = require("fs");
+              fs.appendFileSync("codes.txt", `${walletAddress} | ${code}\n`);
+            } else {
+              console.log(`  ~ Kode tidak terdeteksi, cek cards.txt`);
+            }
+          }
+        } else {
+          console.log(`  ~ Tweet gagal, skip submit card_share`);
         }
       } else {
         console.log(`  ~ Card belum ready (${cardState}), skip card_share`);
