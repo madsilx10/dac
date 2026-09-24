@@ -205,9 +205,7 @@ async function connectX(session, akun, idx, total) {
       || startJson?.data?.auth_url
       || startJson?.data?.url;
     if (!authUrl) throw new Error("Gagal dapat auth_url: " + JSON.stringify(startJson));
-    console.log(`  auth_url: ${authUrl}`)
     const params = parseQS(authUrl);
-    console.log(`  params: ${JSON.stringify(params)}`);
 
     const { state, code_challenge, code_challenge_method, client_id } = params;
     const redirect_uri = params.redirect_uri || `${BASE}/api/v1/auth/social/x/callback/`;
@@ -233,9 +231,7 @@ async function connectX(session, akun, idx, total) {
       },
       redirect: "follow",
     });
-    console.log(`  GET status: ${getRes.status} | url: ${getRes.url}`);
     const html = await getRes.text();
-    require('fs').writeFileSync('debug_html.txt', html); console.log(`  HTML saved to debug_html.txt | status: ${getRes.status} | url: ${getRes.url}`);
 
     // Extract authCode dari JSON embed di HTML
     const authCodeMatch = html.match(/authCode:"([^"]+)"/);
@@ -421,16 +417,32 @@ async function completeTasks(session, walletAddress, akun) {
       await new Promise(r => setTimeout(r, 1000));
     }
 
-    // Download card image
+    // Poll card sampai ready
     if (cardShareTask && cardShareTask.state !== "verified") {
-      console.log(`  Ambil card...`);
-      const cardRes = await fetch(`${BASE}/api/v1/launch/card/`, {
-        method: "GET",
-        headers: buildHeaders(cookie),
-      });
-      const cardJson = await cardRes.json();
-      const cardState = cardJson?.data?.state;
-      console.log(`  Card state: ${cardState}`);
+      let cardJson = null;
+      let cardState = null;
+      const MAX_WAIT = 120; // maks 2 menit
+      const INTERVAL = 5;   // cek tiap 5 detik
+      let elapsed = 0;
+
+      console.log(`  Nunggu card ready...`);
+      while (elapsed < MAX_WAIT) {
+        const cardRes = await fetch(`${BASE}/api/v1/launch/card/`, {
+          method: "GET",
+          headers: buildHeaders(cookie),
+        });
+        cardJson = await cardRes.json();
+        cardState = cardJson?.data?.state;
+        console.log(`  Card state: ${cardState} (${elapsed}s)`);
+        if (cardState === "ready") break;
+        await new Promise(r => setTimeout(r, INTERVAL * 1000));
+        elapsed += INTERVAL;
+      }
+
+      if (cardState !== "ready") {
+        console.log(`  ~ Card tidak ready setelah ${MAX_WAIT}s, skip card_share`);
+        return;
+      }
 
       // Save asset_url ke file
       if (cardJson?.data?.asset_url) {
@@ -440,10 +452,7 @@ async function completeTasks(session, walletAddress, akun) {
         console.log(`  Card URL saved → cards.txt`);
       }
 
-      if (cardState === "ready") {
-        // Jeda 10 detik sebelum card_share
-        console.log(`  Jeda 10 detik...`);
-        await new Promise(r => setTimeout(r, 10000));
+      if (true) { // card sudah pasti ready di sini
 
         // Ambil handle X dari me/
         const meData = await checkMe(cookie);
@@ -484,8 +493,6 @@ async function completeTasks(session, walletAddress, akun) {
         } else {
           console.log(`  ~ Tweet gagal, skip submit card_share`);
         }
-      } else {
-        console.log(`  ~ Card belum ready (${cardState}), skip card_share`);
       }
     } else if (cardShareTask?.state === "verified") {
       console.log(`  ✓ card_share (sudah verified)`);
