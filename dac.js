@@ -291,7 +291,7 @@ async function postTweet(akun, text, url) {
 
   try {
     // Ambil queryId fresh dari x.com
-    const QUERY_ID = "UYy4T67XpYXgDKTHBK7GXg";
+    const QUERY_ID = "SoVnbfCycZ7fERGCwpZkYA";
     const res = await fetch(`https://x.com/i/api/graphql/${QUERY_ID}/CreateTweet`, {
       method: "POST",
       headers: {
