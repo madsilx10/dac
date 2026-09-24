@@ -290,12 +290,14 @@ async function postTweet(akun, text, url) {
   const fullText = `${text}\n${url}`;
 
   try {
-    const res = await fetch("https://api.twitter.com/1.1/statuses/update.json", {
+    // Ambil queryId fresh dari x.com
+    const QUERY_ID = "UYy4T67XpYXgDKTHBK7GXg";
+    const res = await fetch(`https://x.com/i/api/graphql/${QUERY_ID}/CreateTweet`, {
       method: "POST",
       headers: {
         "Accept": "*/*",
         "Authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA",
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
         "Cookie": `auth_token=${authToken}; ct0=${ct0}`,
         "Origin": "https://x.com",
         "Referer": "https://x.com/",
@@ -303,12 +305,51 @@ async function postTweet(akun, text, url) {
         "X-Csrf-Token": ct0,
         "X-Twitter-Active-User": "yes",
         "X-Twitter-Auth-Type": "OAuth2Session",
+        "X-Twitter-Client-Language": "id",
+        "X-Client-Uuid": crypto.randomUUID(),
       },
-      body: new URLSearchParams({ status: fullText }).toString(),
+      body: JSON.stringify({
+        variables: {
+          tweet_text: fullText,
+          dark_request: false,
+          media: { media_entities: [], possibly_sensitive: false },
+          semantic_annotation_ids: [],
+          disallowed_reply_options: null,
+        },
+        features: {
+          communities_web_enable_tweet_community_results_fetch: true,
+          c9s_tweet_anatomy_moderator_badge_enabled: true,
+          responsive_web_edit_tweet_api_enabled: true,
+          graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+          view_counts_everywhere_api_enabled: true,
+          longform_notetweets_consumption_enabled: true,
+          responsive_web_twitter_article_tweet_consumption_enabled: true,
+          tweet_awards_web_tipping_enabled: false,
+          creator_subscriptions_quote_tweet_preview_enabled: false,
+          longform_notetweets_rich_text_read_enabled: true,
+          longform_notetweets_inline_media_enabled: true,
+          articles_preview_enabled: true,
+          rweb_video_timestamps_enabled: true,
+          rweb_tipjar_consumption_enabled: true,
+          responsive_web_graphql_exclude_directive_enabled: true,
+          verified_phone_label_enabled: false,
+          freedom_of_speech_not_reach_fetch_enabled: true,
+          standardized_nudges_misinfo: true,
+          tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+          responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+          responsive_web_graphql_timeline_navigation_enabled: true,
+          responsive_web_enhance_cards_enabled: false,
+        },
+        queryId: QUERY_ID,
+      }),
     });
 
-    const json = await res.json();
-    const tweetId = json?.id_str;
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); }
+    catch(e) { throw new Error("Non-JSON response: " + text.slice(0, 200)); }
+
+    const tweetId = json?.data?.create_tweet?.tweet_results?.result?.rest_id;
     if (tweetId) {
       console.log(`  ✓ Tweet posted: https://x.com/i/web/status/${tweetId}`);
       return true;
