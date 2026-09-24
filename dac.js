@@ -118,6 +118,16 @@ async function post(url, body, cookie) {
   return { json, setCookie, status: res.status };
 }
 
+// ── Helper: Cek status akun ──
+async function checkMe(cookie) {
+  const res = await fetch(`${BASE}/api/v1/auth/me/`, {
+    method: "GET",
+    headers: buildHeaders(cookie),
+  });
+  const json = await res.json();
+  return json?.data;
+}
+
 // ── STEP 1: Login SIWE ──
 async function loginWallet(pk, idx, total) {
   const wallet = new ethers.Wallet(pk);
@@ -274,23 +284,97 @@ async function connectX(session, akun, idx, total) {
 }
 
 
+// ── Helper: Post Tweet ──
+async function postTweet(akun, text, url) {
+  const { authToken, ct0 } = akun;
+  const fullText = `${text}\n${url}`;
+
+  try {
+    const res = await fetch("https://api.twitter.com/graphql/oB-5XsHNAbjvARJEc8CZFw/CreateTweet", {
+      method: "POST",
+      headers: {
+        "Accept": "*/*",
+        "Authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA",
+        "Content-Type": "application/json",
+        "Cookie": `auth_token=${authToken}; ct0=${ct0}`,
+        "Origin": "https://x.com",
+        "Referer": "https://x.com/",
+        "User-Agent": UA,
+        "X-Csrf-Token": ct0,
+        "X-Twitter-Active-User": "yes",
+        "X-Twitter-Auth-Type": "OAuth2Session",
+        "X-Twitter-Client-Language": "id",
+      },
+      body: JSON.stringify({
+        variables: {
+          tweet_text: fullText,
+          dark_request: false,
+          media: { media_entities: [], possibly_sensitive: false },
+          semantic_annotation_ids: [],
+          disallowed_reply_options: null,
+        },
+        features: {
+          communities_web_enable_tweet_community_results_fetch: true,
+          c9s_tweet_anatomy_moderator_badge_enabled: true,
+          responsive_web_edit_tweet_api_enabled: true,
+          graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+          view_counts_everywhere_api_enabled: true,
+          longform_notetweets_consumption_enabled: true,
+          responsive_web_twitter_article_tweet_consumption_enabled: true,
+          tweet_awards_web_tipping_enabled: false,
+          creator_subscriptions_quote_tweet_preview_enabled: false,
+          longform_notetweets_rich_text_read_enabled: true,
+          longform_notetweets_inline_media_enabled: true,
+          articles_preview_enabled: true,
+          rweb_video_timestamps_enabled: true,
+          rweb_tipjar_consumption_enabled: true,
+          responsive_web_graphql_exclude_directive_enabled: true,
+          verified_phone_label_enabled: false,
+          freedom_of_speech_not_reach_fetch_enabled: true,
+          standardized_nudges_misinfo: true,
+          tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+          responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+          responsive_web_graphql_timeline_navigation_enabled: true,
+          responsive_web_enhance_cards_enabled: false,
+        },
+        queryId: "oB-5XsHNAbjvARJEc8CZFw",
+      }),
+    });
+
+    const json = await res.json();
+    const tweetId = json?.data?.create_tweet?.tweet_results?.result?.rest_id;
+    if (tweetId) {
+      console.log(`  ✓ Tweet posted: https://x.com/i/web/status/${tweetId}`);
+      return true;
+    } else {
+      console.error(`  ✗ Tweet gagal: ${JSON.stringify(json?.errors ?? json).slice(0, 200)}`);
+      return false;
+    }
+  } catch (err) {
+    console.error(`  ✗ Tweet error: ${err.message}`);
+    return false;
+  }
+}
+
 // ── STEP 3: Complete Tasks ──
-async function completeTasks(session) {
+async function completeTasks(session, walletAddress, akun) {
   const { cookie } = session;
   console.log(`  Ngerjain tasks...`);
 
   try {
-    // Ambil list tasks
     const tasksRes = await fetch(`${BASE}/api/v1/launch/tasks/`, {
       method: "GET",
       headers: buildHeaders(cookie),
     });
     const tasksJson = await tasksRes.json();
     const tasks = tasksJson?.data?.tasks ?? [];
-    console.log(`  Tasks ditemukan: ${tasks.map(t => t.slug).join(", ")}`);
+    console.log(`  Tasks: ${tasks.map(t => t.slug).join(", ")}`);
 
-    // Attempt semua task yang actionable atau self_declared
-    for (const task of tasks) {
+    // Pisah card_share, kerjain yang lain dulu
+    const normalTasks = tasks.filter(t => t.slug !== "card_share");
+    const cardShareTask = tasks.find(t => t.slug === "card_share");
+
+    for (const task of normalTasks) {
       if (task.state === "verified") {
         console.log(`  ✓ ${task.slug} (sudah verified)`);
         continue;
@@ -309,6 +393,47 @@ async function completeTasks(session) {
       }
       await new Promise(r => setTimeout(r, 1000));
     }
+
+    // Download card image
+    if (cardShareTask && cardShareTask.state !== "verified") {
+      console.log(`  Ambil card...`);
+      const cardRes = await fetch(`${BASE}/api/v1/launch/card/`, {
+        method: "GET",
+        headers: buildHeaders(cookie),
+      });
+      const cardJson = await cardRes.json();
+      const cardState = cardJson?.data?.state;
+      const assetUrl = cardJson?.data?.asset_url;
+      console.log(`  Card state: ${cardState}`);
+
+      if (cardState === "ready") {
+        // Jeda 10 detik sebelum card_share
+        console.log(`  Jeda 10 detik...`);
+        await new Promise(r => setTimeout(r, 10000));
+
+        // Post tweet dengan card
+        const tweetText = "I'm pre-registered for the DAC mainnet launch. Mission card in hand — see you at the gate. @dac_chain";
+        const cardUrl = `${BASE}/api/v1/launch/card/${cardJson.data.asset_key}/`;
+        const tweetPosted = await postTweet(akun, tweetText, cardUrl);
+
+        if (tweetPosted) {
+          // Attempt card_share
+          const shareRes = await fetch(`${BASE}/api/v1/launch/tasks/card_share/attempt/`, {
+            method: "POST",
+            headers: buildHeaders(cookie),
+            body: JSON.stringify({ declared: true }),
+          });
+          const shareJson = await shareRes.json();
+          const shareState = shareJson?.data?.task?.state;
+          console.log(`  ${shareState === "verified" ? "✓" : "~"} card_share: ${shareState}`);
+        }
+      } else {
+        console.log(`  ~ Card belum ready (${cardState}), skip card_share`);
+      }
+    } else if (cardShareTask?.state === "verified") {
+      console.log(`  ✓ card_share (sudah verified)`);
+    }
+
   } catch (err) {
     console.error(`  ✗ Tasks: ${err.message}`);
   }
@@ -362,9 +487,18 @@ async function main() {
     if (!session) continue;
     loginOk++;
     await bindReferral(session.cookie);
-    const xResult = await connectX(session, allAkun[idx], idx, total);
+    // Cek apakah X sudah terhubung
+    const meData = await checkMe(session.cookie);
+    const xLinked = meData?.social_links?.some(s => s.provider === "x");
+    let xResult = false;
+    if (xLinked) {
+      console.log(`  ~ X sudah terhubung (${meData.social_links.find(s=>s.provider==="x").handle}), skip`);
+      xResult = true;
+    } else {
+      xResult = await connectX(session, allAkun[idx], idx, total);
+    }
     if (xResult) xOk++;
-    await completeTasks(session);
+    await completeTasks(session, session.address, allAkun[idx]);
     if (i < targets.length - 1) await new Promise(r => setTimeout(r, 2000));
   }
 
