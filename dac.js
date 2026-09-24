@@ -273,6 +273,47 @@ async function connectX(session, akun, idx, total) {
   }
 }
 
+
+// ── STEP 3: Complete Tasks ──
+async function completeTasks(session) {
+  const { cookie } = session;
+  console.log(`  Ngerjain tasks...`);
+
+  try {
+    // Ambil list tasks
+    const tasksRes = await fetch(`${BASE}/api/v1/launch/tasks/`, {
+      method: "GET",
+      headers: buildHeaders(cookie),
+    });
+    const tasksJson = await tasksRes.json();
+    const tasks = tasksJson?.data?.tasks ?? [];
+    console.log(`  Tasks ditemukan: ${tasks.map(t => t.slug).join(", ")}`);
+
+    // Attempt semua task yang actionable atau self_declared
+    for (const task of tasks) {
+      if (task.state === "verified") {
+        console.log(`  ✓ ${task.slug} (sudah verified)`);
+        continue;
+      }
+      try {
+        const attemptRes = await fetch(`${BASE}/api/v1/launch/tasks/${task.slug}/attempt/`, {
+          method: "POST",
+          headers: buildHeaders(cookie),
+          body: JSON.stringify({ declared: true }),
+        });
+        const attemptJson = await attemptRes.json();
+        const state = attemptJson?.data?.task?.state;
+        console.log(`  ${state === "verified" ? "✓" : "~"} ${task.slug}: ${state}`);
+      } catch (err) {
+        console.error(`  ✗ ${task.slug}: ${err.message}`);
+      }
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  } catch (err) {
+    console.error(`  ✗ Tasks: ${err.message}`);
+  }
+}
+
 function ask(q) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise(res => rl.question(q, ans => { rl.close(); res(ans.trim()); }));
@@ -323,6 +364,7 @@ async function main() {
     await bindReferral(session.cookie);
     const xResult = await connectX(session, allAkun[idx], idx, total);
     if (xResult) xOk++;
+    await completeTasks(session);
     if (i < targets.length - 1) await new Promise(r => setTimeout(r, 2000));
   }
 
